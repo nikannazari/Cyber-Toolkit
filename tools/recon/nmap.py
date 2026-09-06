@@ -1,8 +1,11 @@
 from typing import Any
-from core.parsers import NmapParseResult, NmapParser
 
 from core.exceptions import ToolValidationError
 from core.option import ToolOption
+from core.parsers import (
+    NmapParseResult,
+    NmapParser,
+)
 from core.tool import Tool
 from core.validators import (
     require_binary,
@@ -14,9 +17,6 @@ from core.validators import (
 class NmapTool(Tool):
     """
     Nmap integration for CyberToolkit.
-
-    The tool translates structured options
-    into a safe Nmap argv list.
     """
 
     name = "nmap"
@@ -50,7 +50,7 @@ class NmapTool(Tool):
 
     def options(self) -> list[ToolOption]:
         """
-        Return options exposed by the GUI.
+        Return options exposed by the UI.
         """
 
         return [
@@ -152,8 +152,8 @@ class NmapTool(Tool):
                 section="Advanced",
                 advanced=True,
                 description=(
-                    "Control the amount of "
-                    "information printed by Nmap."
+                    "Control the amount of information "
+                    "printed by Nmap."
                 ),
             ),
         ]
@@ -163,7 +163,7 @@ class NmapTool(Tool):
         options: dict[str, Any],
     ) -> None:
         """
-        Validate Nmap configuration.
+        Validate Nmap options.
         """
 
         target = options.get(
@@ -234,14 +234,12 @@ class NmapTool(Tool):
             "T3",
         )
 
-        allowed_timings = {
+        if timing not in {
             "T2",
             "T3",
             "T4",
             "T5",
-        }
-
-        if timing not in allowed_timings:
+        }:
 
             raise ToolValidationError(
                 f"Unsupported timing template: {timing}"
@@ -252,13 +250,11 @@ class NmapTool(Tool):
             "Normal",
         )
 
-        allowed_verbosity = {
+        if verbosity not in {
             "Normal",
             "Verbose",
             "Very Verbose",
-        }
-
-        if verbosity not in allowed_verbosity:
+        }:
 
             raise ToolValidationError(
                 f"Unsupported verbosity: {verbosity}"
@@ -269,7 +265,7 @@ class NmapTool(Tool):
         options: dict[str, Any],
     ) -> list[str]:
         """
-        Build a safe Nmap argv list.
+        Build the Nmap argv list.
         """
 
         self.validate(
@@ -361,13 +357,13 @@ class NmapTool(Tool):
         )
 
         return command
-    
+
     def parse_output(
         self,
         output: str,
     ) -> NmapParseResult:
         """
-        Convert Nmap stdout into structured data.
+        Parse Nmap stdout.
         """
 
         parser = NmapParser()

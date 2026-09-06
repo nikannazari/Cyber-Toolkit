@@ -9,11 +9,18 @@ class PortResult:
     """
 
     port: int
+
     protocol: str
+
     state: str
+
     service: str | None = None
+
     product: str | None = None
+
     version: str | None = None
+
+    extra: str | None = None
 
 
 @dataclass
@@ -23,8 +30,11 @@ class HostResult:
     """
 
     address: str
+
     hostname: str | None = None
+
     status: str = "unknown"
+
     ports: list[PortResult] = field(
         default_factory=list
     )
@@ -33,7 +43,7 @@ class HostResult:
 @dataclass
 class NmapParseResult:
     """
-    Structured result produced by the Nmap parser.
+    Structured Nmap result.
     """
 
     hosts: list[HostResult] = field(
@@ -51,31 +61,36 @@ class NmapParseResult:
             for host in self.hosts
         )
 
+    @property
+    def open_port_count(self) -> int:
+        return sum(
+            1
+            for host in self.hosts
+            for port in host.ports
+            if port.state == "open"
+        )
+
 
 class NmapParser:
     """
-    Parser for standard Nmap text output.
-
-    This parser intentionally handles common output
-    rather than attempting to understand every possible
-    Nmap output format.
+    Parser for common Nmap human-readable output.
     """
 
     HOST_PATTERN = re.compile(
-        r"Nmap scan report for (.+)"
+        r"^Nmap scan report for (.+)$"
     )
 
-    HOST_IP_PATTERN = re.compile(
-        r"Nmap scan report for .*?\(([\d.:a-fA-F]+)\)"
+    HOST_WITH_IP_PATTERN = re.compile(
+        r"^(.+?)\s+\(([^)]+)\)$"
     )
 
     HOST_STATUS_PATTERN = re.compile(
-        r"Host is (up|down)"
+        r"^Host is (up|down)"
     )
 
     PORT_PATTERN = re.compile(
-        r"^(\d+)\/(\w+)\s+"
-        r"(\w+)\s+"
+        r"^(\d+)\/(\S+)\s+"
+        r"(\S+)\s+"
         r"(\S+)"
         r"(?:\s+(.*))?$"
     )
@@ -99,44 +114,11 @@ class NmapParser:
             if not line:
                 continue
 
-            host_match = self.HOST_PATTERN.match(
-                line
-            )
+            host = self._parse_host(line)
 
-            if host_match:
+            if host is not None:
 
-                host_text = host_match.group(1)
-
-                ip_match = (
-                    self.HOST_IP_PATTERN.match(
-                        line
-                    )
-                )
-
-                if ip_match:
-
-                    address = (
-                        ip_match.group(1)
-                    )
-
-                    hostname = (
-                        host_text
-                        .split(
-                            "(",
-                            1,
-                        )[0]
-                        .strip()
-                    )
-
-                else:
-
-                    address = host_text
-                    hostname = None
-
-                current_host = HostResult(
-                    address=address,
-                    hostname=hostname,
-                )
+                current_host = host
 
                 result.hosts.append(
                     current_host
@@ -147,68 +129,217 @@ class NmapParser:
             if current_host is None:
                 continue
 
-            status_match = (
-                self.HOST_STATUS_PATTERN.search(
-                    line
-                )
-            )
-
-            if status_match:
-
-                current_host.status = (
-                    status_match.group(1)
-                )
-
-                continue
-
-            if line.startswith(
-                "PORT"
-            ):
-
-                continue
-
-            port_match = self.PORT_PATTERN.match(
+            status = self._parse_host_status(
                 line
             )
 
-            if port_match:
+            if status is not None:
 
-                port = int(
-                    port_match.group(1)
-                )
+                current_host.status = status
 
-                protocol = (
-                    port_match.group(2)
-                )
+                continue
 
-                state = (
-                    port_match.group(3)
-                )
+            port = self._parse_port(
+                line
+            )
 
-                service = (
-                    port_match.group(4)
-                )
-
-                details = (
-                    port_match.group(5)
-                )
-
-                product = None
-                version = None
-
-                if details:
-
-                    product = details.strip()
+            if port is not None:
 
                 current_host.ports.append(
-                    PortResult(
-                        port=port,
-                        protocol=protocol,
-                        state=state,
-                        service=service,
-                        product=product,
-                        version=version,
-                    )
+                    port
                 )
 
         return result
+
+    def _parse_host(
+        self,
+        line: str,
+    ) -> HostResult | None:
+        """
+        Parse:
+
+            Nmap scan report for 192.168.1.10
+
+        or:
+
+            Nmap scan report for server.local
+            (192.168.1.10)
+        """
+
+        match = self.HOST_PATTERN.match(
+            line
+        )
+
+        if not match:
+            return None
+
+        value = match.group(1).strip()
+
+        host_match = (
+            self.HOST_WITH_IP_PATTERN.match(
+                value
+            )
+        )
+
+        if host_match:
+
+            hostname = (
+                host_match.group(1).strip()
+            )
+
+            address = (
+                host_match.group(2).strip()
+            )
+
+            return HostResult(
+                address=address,
+                hostname=hostname,
+            )
+
+        return HostResult(
+            address=value
+        )
+
+    def _parse_host_status(
+        self,
+        line: str,
+    ) -> str | None:
+        """
+        Parse:
+
+            Host is up
+            Host is down
+        """
+
+        match = self.HOST_STATUS_PATTERN.match(
+            line
+        )
+
+        if not match:
+            return None
+
+        return match.group(1)
+
+    def _parse_port(
+        self,
+        line: str,
+    ) -> PortResult | None:
+        """
+        Parse standard Nmap port lines.
+
+        Example:
+
+            22/tcp open ssh OpenSSH 9.9
+
+        """
+
+        match = self.PORT_PATTERN.match(
+            line
+        )
+
+        if not match:
+            return None
+
+        port = int(
+            match.group(1)
+        )
+
+        protocol = (
+            match.group(2)
+        )
+
+        state = (
+            match.group(3)
+        )
+
+        service = (
+            match.group(4)
+        )
+
+        details = (
+            match.group(5)
+        )
+
+        product = None
+        version = None
+        extra = None
+
+        if details:
+
+            product, version, extra = (
+                self._parse_service_details(
+                    details
+                )
+            )
+
+        return PortResult(
+            port=port,
+            protocol=protocol,
+            state=state,
+            service=service,
+            product=product,
+            version=version,
+            extra=extra,
+        )
+
+    def _parse_service_details(
+        self,
+        details: str,
+    ) -> tuple[
+        str | None,
+        str | None,
+        str | None,
+    ]:
+        """
+        Attempt to separate product/version information.
+
+        This is intentionally conservative because Nmap's
+        service output is not guaranteed to follow one format.
+        """
+
+        details = details.strip()
+
+        if not details:
+            return None, None, None
+
+        version_match = re.search(
+            r"(?<!\d)"
+            r"(\d+(?:\.\d+)+)"
+            r"(?:[-_][A-Za-z0-9._-]+)?"
+            r"(?!\d)",
+            details,
+        )
+
+        if not version_match:
+
+            return (
+                details,
+                None,
+                None,
+            )
+
+        version = (
+            version_match.group(1)
+        )
+
+        product = (
+            details[:version_match.start()]
+            .strip()
+        )
+
+        extra = (
+            details[version_match.end():]
+            .strip()
+        )
+
+        if not product:
+            product = None
+
+        if not extra:
+            extra = None
+
+        return (
+            product,
+            version,
+            extra,
+        )

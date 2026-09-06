@@ -139,10 +139,12 @@ def render_dashboard(
             result,
         )
 
-        render_structured_result(
-            tool,
-            result.stdout,
-        )
+        if result.success:
+
+            render_structured_result(
+                tool,
+                result.stdout,
+            )
 
         render_terminal(
             result.stdout,
@@ -265,7 +267,7 @@ def render_structured_result(
         "Scan Summary"
     )
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
 
@@ -281,6 +283,13 @@ def render_structured_result(
             parsed.port_count,
         )
 
+    with col3:
+
+        st.metric(
+            "Open Ports",
+            parsed.open_port_count,
+        )
+
     if not parsed.hosts:
 
         st.info(
@@ -289,17 +298,27 @@ def render_structured_result(
 
         return
 
+    st.divider()
+
     for host in parsed.hosts:
 
-        hostname = (
-            f" ({host.hostname})"
-            if host.hostname
-            else ""
+        if host.hostname:
+
+            title = (
+                f"{host.hostname} "
+                f"({host.address})"
+            )
+
+        else:
+
+            title = host.address
+
+        title = (
+            f"{title} — {host.status}"
         )
 
         with st.expander(
-            f"{host.address}{hostname} — "
-            f"{host.status}",
+            title,
             expanded=True,
         ):
 
@@ -311,22 +330,36 @@ def render_structured_result(
 
                 continue
 
-            table = []
+            rows = []
 
             for port in host.ports:
 
-                table.append(
+                rows.append(
                     {
                         "Port": port.port,
                         "Protocol": port.protocol,
                         "State": port.state,
-                        "Service": port.service or "",
-                        "Details": port.product or "",
+                        "Service": (
+                            port.service
+                            or ""
+                        ),
+                        "Product": (
+                            port.product
+                            or ""
+                        ),
+                        "Version": (
+                            port.version
+                            or ""
+                        ),
+                        "Extra": (
+                            port.extra
+                            or ""
+                        ),
                     }
                 )
 
             st.dataframe(
-                table,
+                rows,
                 use_container_width=True,
                 hide_index=True,
             )
