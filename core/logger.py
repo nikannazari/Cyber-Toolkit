@@ -4,24 +4,24 @@ import logging
 def get_logger(
     name: str = "cybertoolkit",
 ) -> logging.Logger:
-    """
-    Return a configured CyberToolkit logger.
-    """
 
     logger = logging.getLogger(name)
 
-    if not logger.handlers:
-        handler = logging.StreamHandler()
+    if logger.handlers:
+        return logger
 
-        formatter = logging.Formatter(
-            "[%(asctime)s] "
-            "[%(levelname)s] "
-            "%(name)s: %(message)s"
-        )
+    handler = logging.StreamHandler()
 
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    formatter = logging.Formatter(
+        "[%(asctime)s] "
+        "[%(levelname)s] "
+        "%(name)s: %(message)s"
+    )
 
-        logger.setLevel(logging.INFO)
+    handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+
+    logger.setLevel(logging.INFO)
 
     return logger

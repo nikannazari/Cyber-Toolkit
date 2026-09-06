@@ -1,16 +1,21 @@
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 
 class Config:
     """
-    Application configuration loader.
+    Simple YAML configuration loader.
     """
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+    ) -> None:
+
         self.path = Path(path)
-        self.data: dict = {}
+        self.data: dict[str, Any] = {}
 
     def load(self) -> None:
         """
@@ -25,15 +30,38 @@ class Config:
             "r",
             encoding="utf-8",
         ) as file:
-            self.data = yaml.safe_load(file) or {}
+
+            loaded = yaml.safe_load(file)
+
+        self.data = (
+            loaded
+            if isinstance(loaded, dict)
+            else {}
+        )
 
     def get(
         self,
         key: str,
-        default=None,
-    ):
-        """
-        Get a top-level configuration value.
-        """
+        default: Any = None,
+    ) -> Any:
 
-        return self.data.get(key, default)
+        return self.data.get(
+            key,
+            default,
+        )
+
+    def get_section(
+        self,
+        section: str,
+    ) -> dict[str, Any]:
+
+        value = self.data.get(
+            section,
+            {},
+        )
+
+        return (
+            value
+            if isinstance(value, dict)
+            else {}
+        )

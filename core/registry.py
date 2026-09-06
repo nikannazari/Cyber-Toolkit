@@ -1,4 +1,7 @@
-from core.exceptions import ToolNotFoundError
+from core.exceptions import (
+    ToolAlreadyRegisteredError,
+    ToolNotFoundError,
+)
 from core.tool import Tool
 
 
@@ -8,49 +11,77 @@ class ToolRegistry:
     """
 
     def __init__(self) -> None:
+
         self._tools: dict[str, Tool] = {}
 
-    def register(self, tool: Tool) -> None:
-        """
-        Register a tool.
-        """
+    def register(
+        self,
+        tool: Tool,
+    ) -> None:
+
         if tool.name in self._tools:
-            raise ValueError(
+
+            raise ToolAlreadyRegisteredError(
                 f"Tool '{tool.name}' is already registered."
             )
 
         self._tools[tool.name] = tool
 
-    def get(self, name: str) -> Tool:
-        """
-        Retrieve a tool by name.
-        """
-        try:
-            return self._tools[name]
-        except KeyError:
+    def unregister(
+        self,
+        name: str,
+    ) -> None:
+
+        if name not in self._tools:
+
             raise ToolNotFoundError(
                 f"Tool '{name}' is not registered."
             )
 
+        del self._tools[name]
+
+    def get(
+        self,
+        name: str,
+    ) -> Tool:
+
+        tool = self._tools.get(name)
+
+        if tool is None:
+
+            raise ToolNotFoundError(
+                f"Tool '{name}' is not registered."
+            )
+
+        return tool
+
     def all(self) -> list[Tool]:
-        """
-        Return all registered tools.
-        """
-        return list(self._tools.values())
+
+        return list(
+            self._tools.values()
+        )
 
     def names(self) -> list[str]:
-        """
-        Return registered tool names.
-        """
-        return list(self._tools.keys())
 
-    def categories(self) -> dict[str, list[Tool]]:
-        """
-        Group tools by category.
-        """
-        result: dict[str, list[Tool]] = {}
+        return list(
+            self._tools.keys()
+        )
+
+    def categories(
+        self,
+    ) -> dict[str, list[Tool]]:
+
+        categories: dict[str, list[Tool]] = {}
 
         for tool in self._tools.values():
-            result.setdefault(tool.category, []).append(tool)
 
-        return result
+            categories.setdefault(
+                tool.category,
+                [],
+            ).append(tool)
+
+        return categories
+
+    def count(self) -> int:
+
+        return len(self._tools)
